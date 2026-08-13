@@ -2,7 +2,7 @@
 
 A polished, mobile-first passwordless login and registration experience for WordPress and WooCommerce. Customers can sign in with a mobile number, username, or email and verify their identity using a one-time password (OTP) delivered by SMS.
 
-> **Current version:** 1.7.2  
+> **Current version:** 1.7.3  
 > **Default documentation language:** English  
 > [راهنمای فارسی](#راهنمای-فارسی)
 
@@ -304,8 +304,15 @@ The plugin version is defined in both the WordPress plugin header and `KADEC_Mob
 Suggested Git tags follow semantic versioning:
 
 ```text
-v1.7.2
+v1.7.3
 ```
+
+### 1.7.3
+
+- Added a per-mobile database advisory lock around OTP verification.
+- Made the attempt read/check/increment/consume sequence concurrency-safe.
+- Prevented parallel requests from reusing one successful OTP.
+- Prevented simultaneous send requests from generating conflicting OTP values.
 
 ## Contributing
 
@@ -604,8 +611,15 @@ soran-login-panel/
 نمونه تگ Git:
 
 ```text
-v1.7.2
+v1.7.3
 ```
+
+### تغییرات نسخه 1.7.3
+
+- اضافه‌شدن قفل دیتابیسی اختصاصی برای بررسی OTP هر شماره
+- اتمیک‌شدن چرخه خواندن، بررسی و افزایش شمارنده تلاش‌ها
+- جلوگیری از استفاده هم‌زمان چند درخواست از یک کد صحیح
+- جلوگیری از ساخته‌شدن دو کد متناقض در ارسال‌های هم‌زمان
 
 ## مشارکت در توسعه
 

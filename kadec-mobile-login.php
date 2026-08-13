@@ -3,7 +3,7 @@
  * Plugin Name: ورود یکپارچه لونا
  * Plugin URI: https://rocketzi.com
  * Description: ورود و ثبت‌نام یکپارچه سایت با شماره موبایل و کد یک‌بارمصرف.
- * Version: 1.7.2
+ * Version: 1.7.3
  * Author: Soran
  * Text Domain: rocketzi-mobile-login
  */
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) exit;
 final class KADEC_Mobile_Login {
     const OPTION = 'kml_options';
     const NONCE  = 'kml_nonce';
-    const VERSION = '1.7.2';
+    const VERSION = '1.7.3';
 	const LOGIN_QUERY_VAR = 'kml_site_login';
 
     /** @var array|null Runtime cache for plugin options to avoid repeated wp_parse_args/defaults calls. */
@@ -838,6 +838,26 @@ final class KADEC_Mobile_Login {
     private function attempt_key($mobile) { return 'kml_try_' . md5($mobile); }
     private function profile_token_key($user_id) { return 'kml_profile_token_' . absint($user_id); }
 
+	/**
+	 * Acquire a database-level lock for one mobile OTP verification flow.
+	 *
+	 * WordPress transient reads and writes are not atomic. MySQL advisory locks
+	 * serialize the complete read/check/increment/delete sequence across PHP
+	 * workers, which prevents parallel requests from bypassing max attempts.
+	 */
+	private function acquire_otp_verify_lock($mobile, $timeout = 3) {
+		global $wpdb;
+		$lock_name = 'kml_otp_' . md5($this->normalize_mobile($mobile));
+		$acquired  = $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, %d)', $lock_name, max(0, (int) $timeout)));
+		return '1' === (string) $acquired ? $lock_name : false;
+	}
+
+	private function release_otp_verify_lock($lock_name) {
+		global $wpdb;
+		if (! $lock_name) return;
+		$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', (string) $lock_name));
+	}
+
     private function client_ip() {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
         return preg_replace('/[^0-9a-fA-F:\.:]/', '', $ip);
@@ -906,12 +926,29 @@ final class KADEC_Mobile_Login {
             wp_send_json_error(['message' => 'تعداد درخواست‌های ارسال کد زیاد است. لطفاً کمی بعد دوباره تلاش کنید.']);
         }
 
-        if (get_transient($this->wait_key($mobile))) wp_send_json_error(['message' => 'ارسال مجدد هر ۲ دقیقه یک‌بار مجاز است.']);
-        $code = $this->generate_code();
-        set_transient($this->transient_key($mobile), wp_hash_password($code), (int)$this->opt('otp_ttl'));
-        set_transient($this->wait_key($mobile), 1, (int)$this->opt('resend_wait'));
-        set_transient($this->attempt_key($mobile), 0, (int)$this->opt('otp_ttl'));
-        set_transient($ip_key, $ip_count + 1, HOUR_IN_SECONDS);
+		$send_lock = $this->acquire_otp_verify_lock($mobile);
+		if (! $send_lock) {
+			wp_send_json_error(['message' => 'درخواست دیگری در حال پردازش است. چند لحظه بعد دوباره تلاش کنید.'], 429);
+		}
+		$send_blocked = false;
+		try {
+			// Recheck after acquiring the lock. Two simultaneous send requests
+			// must never generate different valid codes for the same mobile.
+			if (get_transient($this->wait_key($mobile))) {
+				$send_blocked = true;
+			} else {
+				$code = $this->generate_code();
+				set_transient($this->transient_key($mobile), wp_hash_password($code), (int) $this->opt('otp_ttl'));
+				set_transient($this->wait_key($mobile), 1, (int) $this->opt('resend_wait'));
+				set_transient($this->attempt_key($mobile), 0, (int) $this->opt('otp_ttl'));
+				set_transient($ip_key, $ip_count + 1, HOUR_IN_SECONDS);
+			}
+		} finally {
+			$this->release_otp_verify_lock($send_lock);
+		}
+		if ($send_blocked) {
+			wp_send_json_error(['message' => 'ارسال مجدد در بازه تعیین‌شده مجاز نیست.'], 429);
+		}
 
         $sent = $this->send_sms($mobile, $code);
         if (is_wp_error($sent)) {
@@ -964,20 +1001,48 @@ final class KADEC_Mobile_Login {
         $code = preg_replace('/[^0-9]/', '', $_POST['code'] ?? '');
         if (!$this->valid_mobile($mobile) || empty($code)) wp_send_json_error(['message' => 'اطلاعات وارد شده معتبر نیست.']);
 
-        $attempt_key = $this->attempt_key($mobile);
-        $attempts = (int) get_transient($attempt_key);
-        if ($attempts >= (int) $this->opt('otp_max_attempts')) {
-            delete_transient($this->transient_key($mobile));
-            wp_send_json_error(['message' => 'تعداد تلاش ناموفق زیاد است. لطفاً کد جدید دریافت کنید.']);
-        }
+		$verify_lock = $this->acquire_otp_verify_lock($mobile);
+		if (! $verify_lock) {
+			wp_send_json_error(['message' => 'درخواست دیگری در حال بررسی است. چند لحظه بعد دوباره تلاش کنید.'], 429);
+		}
 
-        $hash = get_transient($this->transient_key($mobile));
-        if (!$hash || !wp_check_password($code, $hash)) {
-            set_transient($attempt_key, $attempts + 1, (int)$this->opt('otp_ttl'));
-            wp_send_json_error(['message' => 'کد تایید اشتباه یا منقضی شده است.']);
-        }
-        delete_transient($this->transient_key($mobile));
-        delete_transient($attempt_key);
+		$verified = false;
+		$blocked  = false;
+		try {
+			$attempt_key = $this->attempt_key($mobile);
+			$attempts    = (int) get_transient($attempt_key);
+			$max_attempts = max(1, (int) $this->opt('otp_max_attempts'));
+
+			if ($attempts >= $max_attempts) {
+				delete_transient($this->transient_key($mobile));
+				$blocked = true;
+			} else {
+				$hash = get_transient($this->transient_key($mobile));
+				if ($hash && wp_check_password($code, $hash)) {
+					// Consume the code while still holding the lock. A concurrent
+					// request can never authenticate with the same OTP afterwards.
+					delete_transient($this->transient_key($mobile));
+					delete_transient($attempt_key);
+					$verified = true;
+				} else {
+					$attempts++;
+					set_transient($attempt_key, $attempts, (int) $this->opt('otp_ttl'));
+					if ($attempts >= $max_attempts) {
+						delete_transient($this->transient_key($mobile));
+						$blocked = true;
+					}
+				}
+			}
+		} finally {
+			$this->release_otp_verify_lock($verify_lock);
+		}
+
+		if ($blocked) {
+			wp_send_json_error(['message' => 'تعداد تلاش ناموفق زیاد است. لطفاً کد جدید دریافت کنید.'], 429);
+		}
+		if (! $verified) {
+			wp_send_json_error(['message' => 'کد تایید اشتباه یا منقضی شده است.'], 403);
+		}
 
         $created_now = false;
         $user = !empty($resolved['user']) ? $resolved['user'] : $this->find_user_by_mobile($mobile);

@@ -1,4 +1,4 @@
-Soran Login Panel 1.7.2
+Soran Login Panel 1.7.3
 
 English documentation is the default and is available in README.md.
 Full Persian documentation is included in the same file under "راهنمای فارسی".
