@@ -1,0 +1,71 @@
+/* Soran Login - Admin UI */
+:root{
+  --kml-primary:#b88912;
+  --kml-primary-2:#e1b22f;
+  --kml-soft:#fff7df;
+  --kml-bg:#fffbf2;
+  --kml-card:#fff;
+  --kml-border:#efe2aa;
+  --kml-text:#2D2230;
+  --kml-muted:#7C6873;
+  --kml-gold:#e1b22f;
+  --kml-success:#166534;
+  --kml-danger:#991b1b;
+  --kml-radius:18px;
+  --kml-shadow:0 14px 34px rgba(184,137,18,.14);
+}
+.kml-admin-wrap{max-width:1240px;margin:22px auto 40px!important;direction:rtl;font-family:tahoma,Arial,sans-serif;color:var(--kml-text)}
+.kml-admin-wrap *{box-sizing:border-box}
+.kml-admin-wrap .ltr{direction:ltr!important;text-align:left!important}
+.kml-admin-wrap code{background:#1118272b;color:#e5e7eb;border-radius:10px;padding:4px 8px;display:inline-block;line-height:1.6}
+.kml-admin-wrap h1{margin:6px 0 10px;font-size:28px;font-weight:900;color:#b88912;line-height:1.5}
+.kml-admin-wrap>p{max-width:760px;margin:0;color:#6b5a65;font-size:14px;line-height:2}
+.kml-admin-hero{margin:22px 0 18px;background:linear-gradient(135deg,#fffbee 0%,#fffdf7 48%,#fff7df 100%);border:1px solid #f1e1a7;border-radius:28px;padding:28px;display:flex;justify-content:space-between;gap:20px;align-items:stretch;box-shadow:0 18px 45px rgba(184,137,18,.12)}
+.kml-admin-hero>div:first-child:before{content:'Login Soran';display:inline-flex;background:#b88912;color:#fff;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;letter-spacing:.4px;margin-bottom:2px}
+.kml-admin-hero-badge{min-width:235px;background:rgba(255,255,255,.82);border:1px solid #f2e7bc;border-radius:22px;padding:18px;display:flex;align-items:center;justify-content:center;text-align:center;color:#e1b22f;font-size:20px;font-weight:900;box-shadow:0 10px 26px rgba(184,137,18,.10)}
+.kml-admin-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;align-items:start}
+.kml-admin-tabs{position:sticky;top:42px;background:#fff;border:1px solid #ead79a;border-radius:24px;padding:12px;box-shadow:0 12px 36px rgba(184,137,18,.12)}
+.kml-admin-tab{width:100%;display:grid;grid-template-columns:34px 1fr;gap:2px 10px;text-decoration:none;padding:14px;border-radius:18px;color:#4d3945;margin-bottom:8px;border:1px solid transparent;background:transparent;text-align:right;cursor:pointer;transition:.18s ease;font-family:inherit}
+.kml-admin-tab-icon{grid-row:1/3;width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#fff4cd;font-size:16px}
+.kml-admin-tab span:last-child{font-size:14px;color:#3e2735;font-weight:800;line-height:1.8}
+.kml-admin-tab:hover{background:#fff9ea;border-color:#f2e4b0}
+.kml-admin-tab.is-active{background:linear-gradient(135deg,#fff6da,#ffffff);border-color:#e4c562;box-shadow:0 10px 24px rgba(225,178,47,.18)}
+.kml-admin-tab.is-active span:last-child{color:#e1b22f}
+.kml-admin-tab.is-active .kml-admin-tab-icon{background:#b88912;color:#fff}
+.kml-admin-sections{min-width:0}
+.kml-admin-section{display:none;background:#fff;border:1px solid #ead79a;border-radius:26px;padding:0;box-shadow:0 14px 34px rgba(184,137,18,.12);overflow:hidden;margin-bottom:18px}
+.kml-admin-section.is-active{display:block}
+.kml-admin-section-head{display:flex;justify-content:space-between;border-bottom:1px solid #f2e7c1;padding:20px 22px 18px;background:#fff}
+.kml-admin-section-head h2{margin:0;color:#b88912;font-size:20px;font-weight:900;line-height:1.5}
+.kml-admin-section-head h2:before{content:'⚙';display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;border-radius:12px;background:#b88912;color:#fff;font-size:15px;font-weight:bold;margin-left:10px;vertical-align:middle}
+.kml-admin-section-head p{margin:7px 45px 0 0;color:#7a6873;line-height:1.9}
+.kml-admin-section-foot{display:flex;justify-content:flex-end;padding:16px 22px 20px;background:#fff;border-top:1px solid #f2e7c1}
+.kml-admin-section-foot .button-primary{background:#e1b22f!important;border-color:#e1b22f!important;border-radius:14px!important;padding:4px 22px!important;min-height:44px!important;font-weight:800!important;box-shadow:0 10px 22px rgba(225,178,47,.22)!important}
+.kml-admin-section-foot .button-primary:hover{background:#b88912!important;border-color:#b88912!important}
+.kml-admin-section .form-table{margin:0;border-collapse:separate;border-spacing:0;width:100%}
+.kml-admin-section .form-table tr{display:grid;grid-template-columns:250px minmax(0,1fr);gap:14px;padding:14px;border-bottom:1px solid #f2e7c1;align-items:start}
+.kml-admin-section .form-table tr:last-child{border-bottom:0}
+.kml-admin-section .form-table th{width:auto!important;padding:14px!important;font-weight:900;color:#4c3040;vertical-align:top;background:#fff9ea;border:1px solid #f0e1b2;border-radius:18px;line-height:1.8}
+.kml-admin-section .form-table td{padding:14px!important;vertical-align:top;background:#fff9ea;border:1px solid #f0e1b2;border-radius:18px;min-width:0}
+.kml-admin-wrap input[type=text],.kml-admin-wrap input[type=password],.kml-admin-wrap input[type=url],.kml-admin-wrap input[type=number],.kml-admin-wrap textarea{width:100%;max-width:650px;border:1px solid #e5cf86!important;border-radius:14px!important;background:#fff!important;padding:10px 12px!important;min-height:42px;box-shadow:none!important;transition:.15s ease;font-family:inherit}
+.kml-admin-wrap input[type=number]{max-width:120px;text-align:center}
+.kml-admin-wrap textarea{line-height:1.9;resize:vertical}
+.kml-admin-wrap input:focus,.kml-admin-wrap textarea:focus{border-color:#e1b22f!important;box-shadow:0 0 0 3px rgba(225,178,47,.20)!important;outline:0}
+.kml-admin-wrap .description{display:block;color:#8a7280;margin-top:8px;line-height:1.9;font-size:12px}
+.kml-admin-wrap label{font-weight:800;color:#4c3040}
+.kml-admin-wrap input[type=checkbox]{border-radius:7px;border-color:#d8bc63;width:18px;height:18px;vertical-align:middle;margin-left:8px}
+.kml-admin-wrap input[type=checkbox]:checked{background:#e1b22f!important;border-color:#e1b22f!important}
+.kml-admin-submit{position:sticky;bottom:20px;z-index:8;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border:1px solid #ead79a;border-radius:22px;padding:14px 16px;display:flex;justify-content:flex-end;align-items:center;box-shadow:0 18px 50px rgba(184,137,18,.18);margin-top:18px}
+.kml-admin-submit p.submit{margin:0;padding:0}
+.kml-admin-submit .button-primary,.kml-test-card .button-primary{background:#e1b22f!important;border-color:#e1b22f!important;border-radius:14px!important;padding:4px 22px!important;min-height:44px!important;font-weight:800!important;box-shadow:0 10px 22px rgba(225,178,47,.22)!important}
+.kml-admin-submit .button-primary:hover,.kml-test-card .button-primary:hover{background:#b88912!important;border-color:#b88912!important}
+.kml-test-card,.kml-shortcode-card{background:#fff;border:1px solid #ead79a;border-radius:26px;padding:22px;margin:18px 0;box-shadow:0 14px 34px rgba(184,137,18,.12)}
+.kml-test-card h2,.kml-shortcode-card h2{margin:0 0 8px;color:#b88912;font-size:20px;font-weight:900}
+.kml-test-card p{color:#7a6873;line-height:1.9;margin-top:0}
+.kml-test-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.kml-test-card #kml-test-mobile{width:260px;direction:ltr;text-align:left}
+#kml-test-result{margin-top:12px;font-weight:900;background:#fff9ea;border:1px solid #f0e1b2;border-radius:14px;padding:11px 13px;display:inline-block;min-width:220px}
+.ok{color:var(--kml-success)!important}.err{color:var(--kml-danger)!important}.kml-admin-empty-heading{display:none!important}
+.kml-shortcode-card code{font-size:13px}
+@media(max-width:1100px){.kml-admin-layout{grid-template-columns:1fr}.kml-admin-tabs{position:static;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kml-admin-tab{margin:0}}
+@media(max-width:782px){.kml-admin-hero{flex-direction:column;padding:18px}.kml-admin-hero-badge{min-width:0}.kml-admin-tabs{grid-template-columns:1fr}.kml-admin-section .form-table tr{grid-template-columns:1fr;padding:12px}.kml-admin-section .form-table th,.kml-admin-section .form-table td{display:block;width:auto!important;padding:12px!important}.kml-admin-submit{position:static}.kml-admin-submit .button-primary,.kml-admin-section-foot .button-primary{width:100%}.kml-test-row{align-items:stretch}.kml-test-card #kml-test-mobile,.kml-test-row .button{width:100%}}
