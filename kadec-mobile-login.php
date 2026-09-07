@@ -3,7 +3,7 @@
  * Plugin Name: ورود یکپارچه لونا
  * Plugin URI: https://rocketzi.com
  * Description: ورود و ثبت‌نام یکپارچه سایت با شماره موبایل و کد یک‌بارمصرف.
- * Version: 1.7.3
+ * Version: 1.8.0
  * Author: Soran
  * Text Domain: rocketzi-mobile-login
  */
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) exit;
 final class KADEC_Mobile_Login {
     const OPTION = 'kml_options';
     const NONCE  = 'kml_nonce';
-    const VERSION = '1.7.3';
+    const VERSION = '1.8.0';
 	const LOGIN_QUERY_VAR = 'kml_site_login';
 
     /** @var array|null Runtime cache for plugin options to avoid repeated wp_parse_args/defaults calls. */
@@ -910,6 +910,42 @@ final class KADEC_Mobile_Login {
         ]);
     }
 
+    /**
+     * Send a normal transactional message using the configured MeliPayamak account.
+     *
+     * This public API deliberately does not use the OTP template or OTP pattern.
+     * Other domain plugins can use it without knowing or duplicating credentials.
+     *
+     * @param string $mobile  Recipient mobile number.
+     * @param string $message Complete SMS body.
+     * @return array|WP_Error
+     */
+    public function send_transactional_sms($mobile, $message) {
+        $mobile  = $this->normalize_mobile($mobile);
+        $message = trim(wp_strip_all_tags((string) $message));
+        $o       = $this->opt();
+
+        if (! $this->valid_mobile($mobile)) {
+            return new WP_Error('sms_mobile_invalid', 'شماره موبایل دریافت‌کننده معتبر نیست.');
+        }
+        if ($message === '') {
+            return new WP_Error('sms_message_empty', 'متن پیامک خالی است.');
+        }
+        if (empty($o['sms_username']) || empty($o['sms_password']) || empty($o['api_url_template'])) {
+            return new WP_Error('sms_settings_missing', 'تنظیمات اتصال ملی‌پیامک در افزونه ورود کامل نیست.');
+        }
+        if (empty($o['sms_from'])) {
+            return new WP_Error('sms_sender_missing', 'خط ارسال عادی ملی‌پیامک ثبت نشده است.');
+        }
+
+        return $this->melipayamak_request('SendSMS', [
+            'to'      => $mobile,
+            'from'    => $o['sms_from'],
+            'text'    => $message,
+            'isFlash' => 'false',
+        ]);
+    }
+
     public function ajax_send_otp() {
         check_ajax_referer(self::NONCE, 'nonce');
         $identifier = $this->normalize_identifier($_POST['mobile'] ?? $_POST['identifier'] ?? '');
@@ -1324,4 +1360,19 @@ $GLOBALS['kadec_mobile_login'] = new KADEC_Mobile_Login();
 function kml_site_login_url($redirect = '') {
 	$plugin = $GLOBALS['kadec_mobile_login'] ?? null;
 	return $plugin instanceof KADEC_Mobile_Login ? $plugin->site_login_url($redirect) : wp_login_url($redirect);
+}
+
+/**
+ * Public transactional SMS gateway for other Luna plugins.
+ *
+ * @param string $mobile  Recipient mobile number.
+ * @param string $message Complete message body.
+ * @return array|WP_Error
+ */
+function kml_send_transactional_sms($mobile, $message) {
+	$plugin = $GLOBALS['kadec_mobile_login'] ?? null;
+	if (! $plugin instanceof KADEC_Mobile_Login) {
+		return new WP_Error('kml_unavailable', 'درگاه پیامک افزونه ورود در دسترس نیست.');
+	}
+	return $plugin->send_transactional_sms($mobile, $message);
 }
