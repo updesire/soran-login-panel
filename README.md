@@ -1,3 +1,5 @@
+> TehranWallet integration branch: this branch preserves the local Soran Login Panel 1.6.4 used by TehranWallet. It is based on the repository history but does not replace the newer Luna 1.8.0 implementation on main. The upstream documentation below may describe features unavailable in this branch.
+
 # Soran Login Panel
 
 A polished, mobile-first passwordless login and registration experience for WordPress and WooCommerce. Customers can sign in with a mobile number, username, or email and verify their identity using a one-time password (OTP) delivered by SMS.

@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: ورود یکپارچه لونا
+ * Plugin Name: لاگین سوران
  * Plugin URI: https://rocketzi.com
- * Description: ورود و ثبت‌نام یکپارچه سایت با شماره موبایل و کد یک‌بارمصرف.
- * Version: 1.8.0
+ * Description: تنظیمات ورود و ثبت‌نام موبایلی مخصوص ووکامرس و قالب Woodmart.
+ * Version: 1.6.4
  * Author: Soran
- * Text Domain: rocketzi-mobile-login
+ * Text Domain: kadec-mobile-login
  */
 
 if (!defined('ABSPATH')) exit;
@@ -13,8 +13,7 @@ if (!defined('ABSPATH')) exit;
 final class KADEC_Mobile_Login {
     const OPTION = 'kml_options';
     const NONCE  = 'kml_nonce';
-    const VERSION = '1.8.0';
-	const LOGIN_QUERY_VAR = 'kml_site_login';
+    const VERSION = '1.6.4';
 
     /** @var array|null Runtime cache for plugin options to avoid repeated wp_parse_args/defaults calls. */
     private $options_cache = null;
@@ -22,21 +21,14 @@ final class KADEC_Mobile_Login {
     public function __construct() {
         add_action('plugins_loaded', [$this, 'init']);
         register_activation_hook(__FILE__, [$this, 'activate']);
-		register_deactivation_hook(__FILE__, [$this, 'deactivate']);
     }
 
     public function init() {
-		load_plugin_textdomain('kadec-mobile-login', false, dirname(plugin_basename(__FILE__)) . '/languages');
-		$this->migrate_luna_branding();
         add_action('admin_menu', [$this, 'admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'admin_assets']);
         add_action('wp_enqueue_scripts', [$this, 'front_assets']);
         add_filter('body_class', [$this, 'filter_body_class']);
-		add_action('init', [$this, 'register_login_route']);
-		add_filter('query_vars', [$this, 'register_query_vars']);
-		add_action('template_redirect', [$this, 'render_site_login'], 1);
-		add_filter('login_url', [$this, 'filter_login_url'], 20, 3);
 
         add_shortcode('soran_mobile_login', [$this, 'shortcode']);
         add_shortcode('kadec_mobile_login', [$this, 'shortcode']);
@@ -86,21 +78,21 @@ final class KADEC_Mobile_Login {
         ?>
         <nav class="kml-mobile-bottom-nav" dir="rtl" aria-label="میانبرهای سوران">
             <a class="kml-mobile-nav-item <?php echo $is_account ? 'is-active' : ''; ?>" href="<?php echo esc_url($account_url); ?>">
-                <span class="kml-mobile-nav-icon">👤</span>
+                <span class="kml-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0"/></svg></span>
                 <span class="kml-mobile-nav-text"><?php echo esc_html($o['mobile_nav_account_text']); ?></span>
             </a>
             <a class="kml-mobile-nav-item <?php echo $is_cart_like ? 'is-active' : ''; ?>" href="<?php echo esc_url($cart_url); ?>">
-                <span class="kml-mobile-nav-icon kml-cart-icon">🛒<?php if ($cart_count > 0): ?><em><?php echo esc_html($cart_count); ?></em><?php endif; ?></span>
+                <span class="kml-mobile-nav-icon kml-cart-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 4h2l2 11h10l3-8H6"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg><?php if ($cart_count > 0): ?><em><?php echo esc_html($cart_count); ?></em><?php endif; ?></span>
                 <span class="kml-mobile-nav-text"><?php echo esc_html($o['mobile_nav_cart_text']); ?></span>
             </a>
             <?php if (($o['support_sheet_enabled'] ?? 'yes') === 'yes'): ?>
             <button type="button" class="kml-mobile-nav-item kml-open-support-sheet">
-                <span class="kml-mobile-nav-icon">💬</span>
+                <span class="kml-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 5h14v11H9l-4 3V5Z"/></svg></span>
                 <span class="kml-mobile-nav-text"><?php echo esc_html($o['mobile_nav_support_text']); ?></span>
             </button>
             <?php else: ?>
             <a class="kml-mobile-nav-item" href="<?php echo esc_url($whatsapp_url); ?>" target="_blank" rel="noopener nofollow">
-                <span class="kml-mobile-nav-icon">💬</span>
+                <span class="kml-mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 5h14v11H9l-4 3V5Z"/></svg></span>
                 <span class="kml-mobile-nav-text"><?php echo esc_html($o['mobile_nav_support_text']); ?></span>
             </a>
             <?php endif; ?>
@@ -207,10 +199,16 @@ final class KADEC_Mobile_Login {
 
         // Fallback: if the reserve endpoint exists but shortcode is not registered, show a safe link only.
         if (function_exists('wc_get_account_endpoint_url')) {
-            echo '<div class="kml-reserved-orders-dashboard" dir="rtl" style="margin-top:24px;padding:18px;border:1px solid #eee;border-radius:14px;background:#fff;">';
-            echo '<h3 style="margin-top:0;">سفارشات در انتظار ارسال</h3>';
-            echo '<p>برای مشاهده سفارش‌های رزرو شده و لینک‌شده، وارد بخش سفارشات در انتظار ارسال شوید.</p>';
-            echo '<a class="button" href="' . esc_url(wc_get_account_endpoint_url('reserved-orders')) . '">مشاهده سفارشات رزرو</a>';
+            $has_reservations = function_exists('WC') && WC()->query && isset(WC()->query->get_query_vars()['reserved-orders']);
+            $orders_url = wc_get_account_endpoint_url($has_reservations ? 'reserved-orders' : 'orders');
+            echo '<section class="kml-reserved-orders-dashboard" dir="rtl" aria-labelledby="kml-reserved-orders-title">';
+            echo '<div class="kml-reserved-orders-dashboard__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></div>';
+            echo '<div class="kml-reserved-orders-dashboard__content">';
+            echo '<span class="kml-reserved-orders-dashboard__eyebrow">پیگیری خرید</span>';
+            echo '<h3 id="kml-reserved-orders-title">' . ($has_reservations ? 'سفارشات در انتظار ارسال' : 'پیگیری سفارش‌های شما') . '</h3>';
+            echo '<p>' . ($has_reservations ? 'سفارش‌های رزرو شده و لینک‌شده را در یک نمای اختصاصی بررسی و پیگیری کنید.' : 'جزئیات خرید و وضعیت سفارش‌های خود را یک‌جا ببینید.') . '</p>';
+            echo '</div>';
+            echo '<a class="button kml-reserved-orders-dashboard__action" href="' . esc_url($orders_url) . '">' . ($has_reservations ? 'مشاهده سفارشات رزرو' : 'مشاهده سفارش‌ها') . ' <span aria-hidden="true">←</span></a>';
             echo '</div>';
         }
     }
@@ -223,13 +221,7 @@ final class KADEC_Mobile_Login {
         $merged['api_url_template'] = $this->normalize_api_url_template($merged['api_url_template'] ?? $defaults['api_url_template']);
         update_option(self::OPTION, $merged);
         $this->options_cache = $merged;
-		$this->register_login_route();
-		flush_rewrite_rules(false);
     }
-
-	public function deactivate() {
-		flush_rewrite_rules(false);
-	}
 
     private function defaults() {
         return [
@@ -249,18 +241,18 @@ final class KADEC_Mobile_Login {
             'api_url_template' => 'https://rest.payamak-panel.com/api/SendSMS',
             'checkout_title' => 'ورود / ثبت‌نام با شماره موبایل',
             'checkout_desc' => 'برای ادامه خرید، شماره موبایل خود را وارد کنید.',
-            'brand_word' => 'LUNA',
+            'brand_word' => 'SORAN',
             'badge_text' => 'ورود سریع و امن',
-            'side_mark' => 'LUNA',
+            'side_mark' => 'SORAN',
             'benefit_pill' => 'ورود آسان بدون دردسر',
             'benefit_title' => 'با شماره موبایل وارد شوید و خریدتان را سریع‌تر ادامه دهید',
-            'benefit_desc' => 'در لونا نیازی به حفظ رمز عبور نیست. کد ورود برای شما پیامک می‌شود و حساب کاربری‌تان امن و مرتب در دسترس می‌ماند.',
+            'benefit_desc' => 'در سوران نیازی به حفظ رمز عبور نیست. کد ورود برای شما پیامک می‌شود و حساب کاربری‌تان امن و مرتب در دسترس می‌ماند.',
             'benefit_1_title' => 'ورود سریع',
             'benefit_1_desc' => 'بدون رمز عبور و فقط با شماره موبایل',
             'benefit_2_title' => 'پیگیری سفارش',
             'benefit_2_desc' => 'مشاهده وضعیت سفارش و خریدهای قبلی',
             'benefit_3_title' => 'خرید امن',
-            'benefit_3_desc' => 'هماهنگ با ووکامرس و امکانات اختصاصی لونا',
+            'benefit_3_desc' => 'هماهنگ با ووکامرس و مناسب قالب Woodmart',
             'mobile_nav_enabled' => 'yes',
             'mobile_nav_account_text' => 'حساب کاربری',
             'mobile_nav_cart_text' => 'سبد خرید',
@@ -281,8 +273,6 @@ final class KADEC_Mobile_Login {
             'support_telegram_url' => '',
             'support_rubika_url' => '',
             'support_phone_number' => '09914164362',
-			'site_login_enabled' => 'yes',
-			'site_login_slug' => 'login',
         ];
     }
 
@@ -298,24 +288,6 @@ final class KADEC_Mobile_Login {
         }
         return untrailingslashit($url);
     }
-
-	private function migrate_luna_branding() {
-		if ('1' === get_option('kml_luna_branding_170')) return;
-		$options = get_option(self::OPTION, []);
-		if (! is_array($options)) $options = [];
-		$replacements = [
-			'brand_word' => ['SORAN', 'LUNA'],
-			'side_mark' => ['SORAN', 'LUNA'],
-			'benefit_desc' => ['در سوران نیازی به حفظ رمز عبور نیست. کد ورود برای شما پیامک می‌شود و حساب کاربری‌تان امن و مرتب در دسترس می‌ماند.', 'در لونا نیازی به حفظ رمز عبور نیست. کد ورود برای شما پیامک می‌شود و حساب کاربری‌تان امن و مرتب در دسترس می‌ماند.'],
-			'benefit_3_desc' => ['هماهنگ با ووکامرس و مناسب قالب Woodmart', 'هماهنگ با ووکامرس و امکانات اختصاصی لونا'],
-		];
-		foreach ($replacements as $key => $values) {
-			if (isset($options[$key]) && $options[$key] === $values[0]) $options[$key] = $values[1];
-		}
-		update_option(self::OPTION, $options, false);
-		update_option('kml_luna_branding_170', '1', false);
-		$this->options_cache = null;
-	}
 
     private function normalize_send_mode($mode) {
         $mode = strtolower(trim((string) $mode));
@@ -446,6 +418,13 @@ final class KADEC_Mobile_Login {
         return function_exists('wc_get_page_permalink') ? wc_get_page_permalink('myaccount') : home_url('/my-account/');
     }
 
+    private function checkout_or_account_url() {
+        if (function_exists('wc_get_checkout_url') && function_exists('WC') && WC()->cart && !WC()->cart->is_empty()) {
+            return wc_get_checkout_url();
+        }
+        return $this->myaccount_url();
+    }
+
     private function opt($key = null) {
         if ($this->options_cache === null) {
             $opts = wp_parse_args(get_option(self::OPTION, []), $this->defaults());
@@ -457,8 +436,8 @@ final class KADEC_Mobile_Login {
 
     public function admin_menu() {
         add_menu_page(
-            'ورود یکپارچه لونا',
-            'ورود لونا',
+            'لاگین سوران',
+            'لاگین سوران',
             'manage_options',
             'kadec-mobile-login',
             [$this, 'settings_page'],
@@ -490,18 +469,18 @@ final class KADEC_Mobile_Login {
         $out['otp_max_attempts'] = min(10, max(3, absint($input['otp_max_attempts'] ?? 5))); 
         $out['checkout_title'] = sanitize_text_field($input['checkout_title'] ?? 'ورود / ثبت‌نام با شماره موبایل');
         $out['checkout_desc'] = sanitize_textarea_field($input['checkout_desc'] ?? 'برای ادامه خرید، شماره موبایل خود را وارد کنید.');
-        $out['brand_word'] = sanitize_text_field($input['brand_word'] ?? 'LUNA');
+        $out['brand_word'] = sanitize_text_field($input['brand_word'] ?? 'SORAN');
         $out['badge_text'] = sanitize_text_field($input['badge_text'] ?? 'ورود سریع و امن');
-        $out['side_mark'] = sanitize_text_field($input['side_mark'] ?? 'LUNA');
+        $out['side_mark'] = sanitize_text_field($input['side_mark'] ?? 'SORAN');
         $out['benefit_pill'] = sanitize_text_field($input['benefit_pill'] ?? 'ورود آسان بدون دردسر');
         $out['benefit_title'] = sanitize_text_field($input['benefit_title'] ?? 'با شماره موبایل وارد شوید و خریدتان را سریع‌تر ادامه دهید');
-        $out['benefit_desc'] = sanitize_textarea_field($input['benefit_desc'] ?? 'در لونا نیازی به حفظ رمز عبور نیست.');
+        $out['benefit_desc'] = sanitize_textarea_field($input['benefit_desc'] ?? 'در سوران نیازی به حفظ رمز عبور نیست.');
         $out['benefit_1_title'] = sanitize_text_field($input['benefit_1_title'] ?? 'ورود سریع');
         $out['benefit_1_desc'] = sanitize_text_field($input['benefit_1_desc'] ?? 'بدون رمز عبور و فقط با شماره موبایل');
         $out['benefit_2_title'] = sanitize_text_field($input['benefit_2_title'] ?? 'پیگیری سفارش');
         $out['benefit_2_desc'] = sanitize_text_field($input['benefit_2_desc'] ?? 'مشاهده وضعیت سفارش و خریدهای قبلی');
         $out['benefit_3_title'] = sanitize_text_field($input['benefit_3_title'] ?? 'خرید امن');
-        $out['benefit_3_desc'] = sanitize_text_field($input['benefit_3_desc'] ?? 'هماهنگ با ووکامرس و امکانات اختصاصی لونا');
+        $out['benefit_3_desc'] = sanitize_text_field($input['benefit_3_desc'] ?? 'هماهنگ با ووکامرس و مناسب قالب Woodmart');
         $out['mobile_nav_enabled'] = !empty($input['mobile_nav_enabled']) ? 'yes' : 'no';
         $out['mobile_nav_account_text'] = sanitize_text_field($input['mobile_nav_account_text'] ?? 'حساب کاربری');
         $out['mobile_nav_cart_text'] = sanitize_text_field($input['mobile_nav_cart_text'] ?? 'سبد خرید');
@@ -522,8 +501,6 @@ final class KADEC_Mobile_Login {
         $out['support_telegram_url'] = esc_url_raw($input['support_telegram_url'] ?? '');
         $out['support_rubika_url'] = esc_url_raw($input['support_rubika_url'] ?? '');
         $out['support_phone_number'] = preg_replace('/[^0-9+]/', '', (string)($input['support_phone_number'] ?? ''));
-		$out['site_login_enabled'] = !empty($input['site_login_enabled']) ? 'yes' : 'no';
-		$out['site_login_slug'] = sanitize_title($input['site_login_slug'] ?? 'login') ?: 'login';
         $out = wp_parse_args($out, $this->defaults());
         $this->options_cache = $out;
         return $out;
@@ -531,11 +508,19 @@ final class KADEC_Mobile_Login {
 
     private function should_load_front_assets() {
         if (is_admin()) return false;
-		if (get_query_var(self::LOGIN_QUERY_VAR)) return true;
         if (function_exists('is_checkout') && is_checkout()) return true;
         if (function_exists('is_account_page') && is_account_page()) return true;
         global $post;
         return $post && isset($post->post_content) && (
+            has_shortcode($post->post_content, 'soran_mobile_login') ||
+            has_shortcode($post->post_content, 'kadec_mobile_login')
+        );
+    }
+
+    /** Return whether the current page already renders the dedicated login shortcode. */
+    private function current_page_has_login_shortcode() {
+        global $post;
+        return $post instanceof WP_Post && isset($post->post_content) && (
             has_shortcode($post->post_content, 'soran_mobile_login') ||
             has_shortcode($post->post_content, 'kadec_mobile_login')
         );
@@ -574,85 +559,31 @@ final class KADEC_Mobile_Login {
 
     public function filter_body_class($classes) {
         if (is_admin()) return $classes;
+
+        if (!is_user_logged_in() && $this->current_page_has_login_shortcode()) {
+            $classes[] = 'kml-has-login-shortcode';
+        }
+
         if (($this->opt('hide_header_footer') ?? 'yes') !== 'yes') return $classes;
 
         $is_hidden_login_shell =
             !is_user_logged_in() &&
             (
                 (function_exists('is_account_page') && is_account_page()) ||
-				(function_exists('is_checkout') && is_checkout()) ||
-				(bool) get_query_var(self::LOGIN_QUERY_VAR)
+                (function_exists('is_checkout') && is_checkout())
             );
 
         if ($is_hidden_login_shell) $classes[] = 'kml-hide-header-footer';
         return $classes;
     }
 
-	public function register_login_route() {
-		if (($this->opt('site_login_enabled') ?? 'yes') !== 'yes') return;
-		$slug = sanitize_title($this->opt('site_login_slug') ?: 'login');
-		add_rewrite_rule('^' . preg_quote($slug, '#') . '/?$', 'index.php?' . self::LOGIN_QUERY_VAR . '=1', 'top');
-		$route_version = self::VERSION . ':' . $slug;
-		if (get_option('kml_login_route_version') !== $route_version) {
-			flush_rewrite_rules(false);
-			update_option('kml_login_route_version', $route_version, false);
-		}
-	}
-
-	public function register_query_vars($vars) {
-		$vars[] = self::LOGIN_QUERY_VAR;
-		return $vars;
-	}
-
-	public function site_login_url($redirect = '') {
-		$slug = sanitize_title($this->opt('site_login_slug') ?: 'login');
-		$url = home_url('/' . $slug . '/');
-		if ($redirect) $url = add_query_arg('redirect_to', $redirect, $url);
-		return $url;
-	}
-
-	public function filter_login_url($login_url, $redirect, $force_reauth) {
-		unset($force_reauth);
-		if (($this->opt('site_login_enabled') ?? 'yes') !== 'yes') return $login_url;
-		// Keep the native WordPress login for dashboard administrators.
-		if ($redirect && (0 === strpos($redirect, admin_url()) || false !== strpos($redirect, '/wp-admin'))) return $login_url;
-		return $this->site_login_url($redirect);
-	}
-
-	private function is_login_destination($url) {
-		$login_path = untrailingslashit((string) wp_parse_url($this->site_login_url(), PHP_URL_PATH));
-		$url_path = untrailingslashit((string) wp_parse_url($url, PHP_URL_PATH));
-		return $login_path && $login_path === $url_path;
-	}
-
-	public function render_site_login() {
-		if (! get_query_var(self::LOGIN_QUERY_VAR)) return;
-		// The standalone login experience always finishes on the site homepage.
-		// Checkout owns a separate embedded login flow and keeps its own destination.
-		$redirect = home_url('/');
-		if (is_user_logged_in()) {
-			wp_safe_redirect($redirect);
-			exit;
-		}
-
-		nocache_headers();
-		status_header(200);
-		$this->enqueue_front_assets_once();
-		get_header();
-		echo '<main class="kml-site-login-page" id="main-content">';
-		echo $this->form_html(false, $redirect);
-		echo '</main>';
-		get_footer();
-		exit;
-	}
-
     public function settings_page() {
         if (!current_user_can('manage_options')) return;
         $o = $this->opt();
         ?>
         <div class="wrap kml-admin-wrap" dir="rtl">
-            <h1>ورود یکپارچه لونا</h1>
-            <p>مدیریت ورود و ثبت‌نام امن مشتریان لونا با کد یک‌بارمصرف</p>
+            <h1>لاگین سوران</h1>
+            <p>پلاگین اختصاصی ورود/ثبت نام تهران ولت</p>
             <?php settings_errors(); ?>
             <form method="post" action="options.php" novalidate>
                 <?php settings_fields('kml_settings_group'); ?>
@@ -674,10 +605,7 @@ final class KADEC_Mobile_Login {
                     <tr><th>تعداد رقم کد</th><td><input type="number" name="<?php echo self::OPTION; ?>[code_length]" value="<?php echo esc_attr($o['code_length']); ?>" min="4" max="8"></td></tr>
                     <tr><th>حداکثر ارسال از هر IP در ساعت</th><td><input type="number" name="<?php echo self::OPTION; ?>[ip_send_limit]" value="<?php echo esc_attr($o['ip_send_limit']); ?>" min="3" max="100"></td></tr>
                     <tr><th>حداکثر تلاش اشتباه کد</th><td><input type="number" name="<?php echo self::OPTION; ?>[otp_max_attempts]" value="<?php echo esc_attr($o['otp_max_attempts']); ?>" min="3" max="10"></td></tr>
-                    <tr><th colspan="2"><h2>🔐 ورود اصلی سایت</h2></th></tr>
-					<tr><th>فعال‌سازی ورود یکپارچه</th><td><label><input type="checkbox" name="<?php echo self::OPTION; ?>[site_login_enabled]" value="1" <?php checked($o['site_login_enabled'] ?? 'yes', 'yes'); ?>> لینک‌های عمومی ورود سایت از فرم OTP استفاده کنند</label><p class="description">ورود مدیریت وردپرس و صفحه اختصاصی متخصصان دست‌نخورده باقی می‌ماند.</p></td></tr>
-					<tr><th>آدرس صفحه ورود</th><td><div style="display:flex;align-items:center;gap:8px;direction:ltr;justify-content:flex-end"><code><?php echo esc_html(home_url('/')); ?></code><input type="text" name="<?php echo self::OPTION; ?>[site_login_slug]" value="<?php echo esc_attr($o['site_login_slug'] ?? 'login'); ?>" class="regular-text" style="max-width:180px" dir="ltr"><code>/</code></div><p class="description">پیشنهاد: <code>login</code>. پس از ذخیره، مسیر به‌صورت خودکار ساخته می‌شود.</p></td></tr>
-					<tr><th>عنوان فرم ورود</th><td><input type="text" name="<?php echo self::OPTION; ?>[checkout_title]" value="<?php echo esc_attr($o['checkout_title']); ?>" class="regular-text"></td></tr>
+                    <tr><th>عنوان فرم checkout</th><td><input type="text" name="<?php echo self::OPTION; ?>[checkout_title]" value="<?php echo esc_attr($o['checkout_title']); ?>" class="regular-text"></td></tr>
                     <tr><th>توضیح فرم checkout</th><td><textarea name="<?php echo self::OPTION; ?>[checkout_desc]" rows="2" class="large-text"><?php echo esc_textarea($o['checkout_desc']); ?></textarea></td></tr>
                     <tr><th colspan="2"><h2>🎨 متن‌ها و ظاهر فرم</h2></th></tr>
                     <tr><th>کلمه برند روی فرم</th><td><input type="text" name="<?php echo self::OPTION; ?>[brand_word]" value="<?php echo esc_attr($o['brand_word']); ?>" class="regular-text"></td></tr>
@@ -838,26 +766,6 @@ final class KADEC_Mobile_Login {
     private function attempt_key($mobile) { return 'kml_try_' . md5($mobile); }
     private function profile_token_key($user_id) { return 'kml_profile_token_' . absint($user_id); }
 
-	/**
-	 * Acquire a database-level lock for one mobile OTP verification flow.
-	 *
-	 * WordPress transient reads and writes are not atomic. MySQL advisory locks
-	 * serialize the complete read/check/increment/delete sequence across PHP
-	 * workers, which prevents parallel requests from bypassing max attempts.
-	 */
-	private function acquire_otp_verify_lock($mobile, $timeout = 3) {
-		global $wpdb;
-		$lock_name = 'kml_otp_' . md5($this->normalize_mobile($mobile));
-		$acquired  = $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, %d)', $lock_name, max(0, (int) $timeout)));
-		return '1' === (string) $acquired ? $lock_name : false;
-	}
-
-	private function release_otp_verify_lock($lock_name) {
-		global $wpdb;
-		if (! $lock_name) return;
-		$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', (string) $lock_name));
-	}
-
     private function client_ip() {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
         return preg_replace('/[^0-9a-fA-F:\.:]/', '', $ip);
@@ -865,7 +773,7 @@ final class KADEC_Mobile_Login {
 
     private function is_sensitive_user($user) {
         if (!$user || empty($user->roles)) return false;
-		$blocked = ['administrator', 'editor', 'shop_manager', 'specialist'];
+        $blocked = ['administrator', 'editor', 'shop_manager'];
         return (bool) array_intersect($blocked, (array) $user->roles);
     }
 
@@ -910,42 +818,6 @@ final class KADEC_Mobile_Login {
         ]);
     }
 
-    /**
-     * Send a normal transactional message using the configured MeliPayamak account.
-     *
-     * This public API deliberately does not use the OTP template or OTP pattern.
-     * Other domain plugins can use it without knowing or duplicating credentials.
-     *
-     * @param string $mobile  Recipient mobile number.
-     * @param string $message Complete SMS body.
-     * @return array|WP_Error
-     */
-    public function send_transactional_sms($mobile, $message) {
-        $mobile  = $this->normalize_mobile($mobile);
-        $message = trim(wp_strip_all_tags((string) $message));
-        $o       = $this->opt();
-
-        if (! $this->valid_mobile($mobile)) {
-            return new WP_Error('sms_mobile_invalid', 'شماره موبایل دریافت‌کننده معتبر نیست.');
-        }
-        if ($message === '') {
-            return new WP_Error('sms_message_empty', 'متن پیامک خالی است.');
-        }
-        if (empty($o['sms_username']) || empty($o['sms_password']) || empty($o['api_url_template'])) {
-            return new WP_Error('sms_settings_missing', 'تنظیمات اتصال ملی‌پیامک در افزونه ورود کامل نیست.');
-        }
-        if (empty($o['sms_from'])) {
-            return new WP_Error('sms_sender_missing', 'خط ارسال عادی ملی‌پیامک ثبت نشده است.');
-        }
-
-        return $this->melipayamak_request('SendSMS', [
-            'to'      => $mobile,
-            'from'    => $o['sms_from'],
-            'text'    => $message,
-            'isFlash' => 'false',
-        ]);
-    }
-
     public function ajax_send_otp() {
         check_ajax_referer(self::NONCE, 'nonce');
         $identifier = $this->normalize_identifier($_POST['mobile'] ?? $_POST['identifier'] ?? '');
@@ -962,34 +834,15 @@ final class KADEC_Mobile_Login {
             wp_send_json_error(['message' => 'تعداد درخواست‌های ارسال کد زیاد است. لطفاً کمی بعد دوباره تلاش کنید.']);
         }
 
-		$send_lock = $this->acquire_otp_verify_lock($mobile);
-		if (! $send_lock) {
-			wp_send_json_error(['message' => 'درخواست دیگری در حال پردازش است. چند لحظه بعد دوباره تلاش کنید.'], 429);
-		}
-		$send_blocked = false;
-		try {
-			// Recheck after acquiring the lock. Two simultaneous send requests
-			// must never generate different valid codes for the same mobile.
-			if (get_transient($this->wait_key($mobile))) {
-				$send_blocked = true;
-			} else {
-				$code = $this->generate_code();
-				set_transient($this->transient_key($mobile), wp_hash_password($code), (int) $this->opt('otp_ttl'));
-				set_transient($this->wait_key($mobile), 1, (int) $this->opt('resend_wait'));
-				set_transient($this->attempt_key($mobile), 0, (int) $this->opt('otp_ttl'));
-				set_transient($ip_key, $ip_count + 1, HOUR_IN_SECONDS);
-			}
-		} finally {
-			$this->release_otp_verify_lock($send_lock);
-		}
-		if ($send_blocked) {
-			wp_send_json_error(['message' => 'ارسال مجدد در بازه تعیین‌شده مجاز نیست.'], 429);
-		}
+        if (get_transient($this->wait_key($mobile))) wp_send_json_error(['message' => 'ارسال مجدد هر ۲ دقیقه یک‌بار مجاز است.']);
+        $code = $this->generate_code();
+        set_transient($this->transient_key($mobile), wp_hash_password($code), (int)$this->opt('otp_ttl'));
+        set_transient($this->wait_key($mobile), 1, (int)$this->opt('resend_wait'));
+        set_transient($this->attempt_key($mobile), 0, (int)$this->opt('otp_ttl'));
+        set_transient($ip_key, $ip_count + 1, HOUR_IN_SECONDS);
 
         $sent = $this->send_sms($mobile, $code);
         if (is_wp_error($sent)) {
-			delete_transient($this->transient_key($mobile));
-			delete_transient($this->attempt_key($mobile));
             delete_transient($this->wait_key($mobile));
             wp_send_json_error(['message' => $sent->get_error_message()]);
         }
@@ -1014,11 +867,6 @@ final class KADEC_Mobile_Login {
                     'key' => 'kadec_mobile',
                     'value' => $mobile,
                     'compare' => '='
-				],
-				[
-					'key' => 'shipping_phone',
-					'value' => $mobile,
-					'compare' => '='
                 ]
             ]
         ]);
@@ -1037,48 +885,20 @@ final class KADEC_Mobile_Login {
         $code = preg_replace('/[^0-9]/', '', $_POST['code'] ?? '');
         if (!$this->valid_mobile($mobile) || empty($code)) wp_send_json_error(['message' => 'اطلاعات وارد شده معتبر نیست.']);
 
-		$verify_lock = $this->acquire_otp_verify_lock($mobile);
-		if (! $verify_lock) {
-			wp_send_json_error(['message' => 'درخواست دیگری در حال بررسی است. چند لحظه بعد دوباره تلاش کنید.'], 429);
-		}
+        $attempt_key = $this->attempt_key($mobile);
+        $attempts = (int) get_transient($attempt_key);
+        if ($attempts >= (int) $this->opt('otp_max_attempts')) {
+            delete_transient($this->transient_key($mobile));
+            wp_send_json_error(['message' => 'تعداد تلاش ناموفق زیاد است. لطفاً کد جدید دریافت کنید.']);
+        }
 
-		$verified = false;
-		$blocked  = false;
-		try {
-			$attempt_key = $this->attempt_key($mobile);
-			$attempts    = (int) get_transient($attempt_key);
-			$max_attempts = max(1, (int) $this->opt('otp_max_attempts'));
-
-			if ($attempts >= $max_attempts) {
-				delete_transient($this->transient_key($mobile));
-				$blocked = true;
-			} else {
-				$hash = get_transient($this->transient_key($mobile));
-				if ($hash && wp_check_password($code, $hash)) {
-					// Consume the code while still holding the lock. A concurrent
-					// request can never authenticate with the same OTP afterwards.
-					delete_transient($this->transient_key($mobile));
-					delete_transient($attempt_key);
-					$verified = true;
-				} else {
-					$attempts++;
-					set_transient($attempt_key, $attempts, (int) $this->opt('otp_ttl'));
-					if ($attempts >= $max_attempts) {
-						delete_transient($this->transient_key($mobile));
-						$blocked = true;
-					}
-				}
-			}
-		} finally {
-			$this->release_otp_verify_lock($verify_lock);
-		}
-
-		if ($blocked) {
-			wp_send_json_error(['message' => 'تعداد تلاش ناموفق زیاد است. لطفاً کد جدید دریافت کنید.'], 429);
-		}
-		if (! $verified) {
-			wp_send_json_error(['message' => 'کد تایید اشتباه یا منقضی شده است.'], 403);
-		}
+        $hash = get_transient($this->transient_key($mobile));
+        if (!$hash || !wp_check_password($code, $hash)) {
+            set_transient($attempt_key, $attempts + 1, (int)$this->opt('otp_ttl'));
+            wp_send_json_error(['message' => 'کد تایید اشتباه یا منقضی شده است.']);
+        }
+        delete_transient($this->transient_key($mobile));
+        delete_transient($attempt_key);
 
         $created_now = false;
         $user = !empty($resolved['user']) ? $resolved['user'] : $this->find_user_by_mobile($mobile);
@@ -1106,9 +926,8 @@ final class KADEC_Mobile_Login {
         wp_set_auth_cookie($user->ID, true);
         do_action('wp_login', $user->user_login, $user);
 
-		$fallback = home_url('/');
+        $fallback = $this->checkout_or_account_url();
         $redirect = wp_validate_redirect($_POST['redirect'] ?? '', $fallback);
-		if ($this->is_login_destination($redirect)) $redirect = $fallback;
 
         $needs_profile = $this->profile_incomplete($user->ID, $created_now);
         $profile_token = '';
@@ -1127,6 +946,21 @@ final class KADEC_Mobile_Login {
         ]);
     }
 
+
+    private function user_has_orders($user_id) {
+        $user_id = absint($user_id);
+        if (!$user_id) return false;
+        if (function_exists('wc_get_orders')) {
+            $orders = wc_get_orders([
+                'customer_id' => $user_id,
+                'limit' => 1,
+                'return' => 'ids',
+                'status' => array_keys(wc_get_order_statuses()),
+            ]);
+            return !empty($orders);
+        }
+        return false;
+    }
 
     private function maybe_merge_current_mobile_user_with_email($current_user_id, $email, $first, $last) {
         if (($this->opt('account_merge_enabled') ?? 'yes') !== 'yes') return ['merged' => false, 'blocked' => false, 'user_id' => $current_user_id, 'message' => ''];
@@ -1170,9 +1004,10 @@ final class KADEC_Mobile_Login {
         delete_user_meta($current_user_id, 'billing_phone');
         delete_user_meta($current_user_id, 'kadec_mobile');
 
-		// Keep the source record as an audit-safe alias. Deleting it based only on
-		// WooCommerce orders could orphan bookings, care plans, gifts, or custom data.
-		update_user_meta($current_user_id, 'kml_merged_at', current_time('mysql'));
+        if (!$this->user_has_orders($current_user_id) && get_user_meta($current_user_id, 'kml_profile_completed', true) !== 'yes') {
+            if (!function_exists('wp_delete_user')) require_once ABSPATH . 'wp-admin/includes/user.php';
+            wp_delete_user($current_user_id);
+        }
 
         wp_set_current_user($legacy->ID);
         wp_set_auth_cookie($legacy->ID, true);
@@ -1210,9 +1045,8 @@ final class KADEC_Mobile_Login {
 
         $merge = $this->maybe_merge_current_mobile_user_with_email($user_id, $email, $first, $last);
         if (!empty($merge['merged'])) {
-            $fallback = home_url('/');
+            $fallback = $this->checkout_or_account_url();
             $redirect = wp_validate_redirect($_POST['redirect'] ?? '', $fallback);
-			if ($this->is_login_destination($redirect)) $redirect = $fallback;
             wp_send_json_success(['message' => $merge['message'], 'redirect' => $redirect]);
         }
         if (!empty($merge['blocked'])) {
@@ -1242,9 +1076,8 @@ final class KADEC_Mobile_Login {
         update_user_meta($user_id, 'kml_profile_completed', 'yes');
         delete_transient($this->profile_token_key($user_id));
 
-        $fallback = home_url('/');
+        $fallback = $this->checkout_or_account_url();
         $redirect = wp_validate_redirect($_POST['redirect'] ?? '', $fallback);
-		if ($this->is_login_destination($redirect)) $redirect = $fallback;
         wp_send_json_success(['message' => 'مشخصات با موفقیت ذخیره شد.', 'redirect' => $redirect]);
     }
 
@@ -1262,6 +1095,11 @@ final class KADEC_Mobile_Login {
     public function replace_woocommerce_login_form() {
         if (is_user_logged_in()) return;
         if (is_admin()) return;
+
+        // The page shortcode is the single source of the login UI. Avoid a
+        // second copy being injected by WooCommerce's login-form hook.
+        if ($this->current_page_has_login_shortcode()) return;
+
         $this->enqueue_front_assets_once();
 
         echo '<div class="kml-woo-login-replacer">';
@@ -1272,7 +1110,10 @@ final class KADEC_Mobile_Login {
 
     public function shortcode($atts = []) {
         $this->enqueue_front_assets_once();
-        if (is_user_logged_in()) return '<div class="kml-box kml-logged">شما وارد شده‌اید.</div>';
+        // Logged-in customers already have the WooCommerce account shell.
+        // Rendering a second status box below it is redundant and disrupts
+        // the shared account layout, so the shortcode becomes a no-op here.
+        if (is_user_logged_in()) return '';
         return $this->form_html(false);
     }
 
@@ -1284,12 +1125,17 @@ final class KADEC_Mobile_Login {
         echo '<style>form.checkout{display:none!important}.woocommerce-form-coupon-toggle,.woocommerce-form-login-toggle{display:none!important}</style>';
     }
 
-    private function form_html($checkout = false, $redirect_override = '') {
+    private function form_html($checkout = false) {
         $o = $this->opt();
+        $mobile_id = wp_unique_id('kml-mobile-');
+        $code_id = wp_unique_id('kml-code-');
+        $first_name_id = wp_unique_id('kml-first-name-');
+        $last_name_id = wp_unique_id('kml-last-name-');
+        $email_id = wp_unique_id('kml-email-');
         ob_start();
         ?>
         <?php
-		$redirect = $redirect_override ?: ($checkout && function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/'));
+        $redirect = $checkout && function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : (is_ssl() ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         ?>
         <div class="kml-auth-shell <?php echo $checkout ? 'kml-auth-shell-checkout' : ''; ?>" dir="rtl">
             <div class="kml-benefit-card">
@@ -1306,15 +1152,15 @@ final class KADEC_Mobile_Login {
             <div class="kml-box <?php echo $checkout ? 'kml-checkout-lock' : ''; ?>" data-redirect="<?php echo esc_url($redirect); ?>">
                 <div class="kml-brand-word"><?php echo esc_html($o['brand_word']); ?></div>
                 <div class="kml-badge">
-                    <span class="kml-badge-icon">✦</span>
+                    <span class="kml-badge-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3m0 12v3M3 12h3m12 0h3m-3.64-6.36-2.12 2.12M8.76 15.24l-2.12 2.12m0-11.72 2.12 2.12m6.48 7.48 2.12 2.12"/></svg></span>
                     <span><?php echo esc_html($o['badge_text']); ?></span>
                 </div>
-                <div class="kml-icon-wrap"><span class="kml-phone-icon">📱</span></div>
-                <h3><?php echo esc_html($o['checkout_title']); ?></h3>
+                <div class="kml-icon-wrap" aria-hidden="true"><span class="kml-phone-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M9.5 5h5M11 18.5h2"/></svg></span></div>
+                <h1 class="kml-login-title"><?php echo esc_html($o['checkout_title']); ?></h1>
                 <p><?php echo esc_html($o['checkout_desc']); ?></p>
                 <div class="kml-step kml-step-mobile">
-                    <label>شماره موبایل، ایمیل یا نام کاربری</label>
-                    <input type="text" class="kml-mobile" placeholder="09123456789 یا ایمیل / نام کاربری" inputmode="text" autocomplete="username">
+                    <label for="<?php echo esc_attr($mobile_id); ?>">شماره موبایل، ایمیل یا نام کاربری</label>
+                    <input id="<?php echo esc_attr($mobile_id); ?>" type="text" class="kml-mobile" placeholder="09123456789 یا ایمیل / نام کاربری" inputmode="text" autocomplete="username">
                     <button type="button" class="button kml-send">ارسال کد تایید</button>
                     <button type="button" class="kml-forgot-link">رمز عبور را فراموش کرده‌اید؟ ورود با کد پیامکی</button>
                 </div>
@@ -1327,9 +1173,9 @@ final class KADEC_Mobile_Login {
                         </div>
                         <button type="button" class="kml-change-mobile">تغییر شماره</button>
                     </div>
-                    <label>کد تایید</label>
+                    <label for="<?php echo esc_attr($code_id); ?>">کد تایید</label>
                     <div class="kml-otp-wrap" dir="ltr" role="group" aria-label="کد تایید پیامکی">
-                        <input type="text" class="kml-code kml-otp-real" placeholder="کد پیامک شده" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="<?php echo esc_attr((int) $this->opt('code_length')); ?>">
+                        <input id="<?php echo esc_attr($code_id); ?>" type="text" class="kml-code kml-otp-real" placeholder="کد پیامک شده" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="<?php echo esc_attr((int) $this->opt('code_length')); ?>">
                         <div class="kml-otp-boxes" aria-hidden="true"></div>
                     </div>
                     <small class="kml-otp-hint">کد پیامک‌شده را وارد کنید؛ بعد از تکمیل، ورود خودکار انجام می‌شود.</small>
@@ -1338,15 +1184,15 @@ final class KADEC_Mobile_Login {
                     <span class="kml-countdown"></span>
                 </div>
                 <div class="kml-step kml-profile-step" style="display:none">
-                    <label>نام</label>
-                    <input type="text" class="kml-first-name" placeholder="نام" autocomplete="given-name">
-                    <label>نام خانوادگی</label>
-                    <input type="text" class="kml-last-name" placeholder="نام خانوادگی" autocomplete="family-name">
-                    <label>ایمیل <small>(اختیاری)</small></label>
-                    <input type="email" class="kml-email" placeholder="example@email.com" autocomplete="email">
+                    <label for="<?php echo esc_attr($first_name_id); ?>">نام</label>
+                    <input id="<?php echo esc_attr($first_name_id); ?>" type="text" class="kml-first-name" placeholder="نام" autocomplete="given-name">
+                    <label for="<?php echo esc_attr($last_name_id); ?>">نام خانوادگی</label>
+                    <input id="<?php echo esc_attr($last_name_id); ?>" type="text" class="kml-last-name" placeholder="نام خانوادگی" autocomplete="family-name">
+                    <label for="<?php echo esc_attr($email_id); ?>">ایمیل <small>(اختیاری)</small></label>
+                    <input id="<?php echo esc_attr($email_id); ?>" type="email" class="kml-email" placeholder="example@email.com" autocomplete="email">
                     <button type="button" class="button kml-save-profile">ذخیره و ادامه</button>
                 </div>
-                <div class="kml-message"></div>
+                <div class="kml-message" role="status" aria-live="polite"></div>
             </div>
         </div>
         <?php
@@ -1354,25 +1200,4 @@ final class KADEC_Mobile_Login {
     }
 }
 
-$GLOBALS['kadec_mobile_login'] = new KADEC_Mobile_Login();
-
-/** Public integration API for themes and other plugins. */
-function kml_site_login_url($redirect = '') {
-	$plugin = $GLOBALS['kadec_mobile_login'] ?? null;
-	return $plugin instanceof KADEC_Mobile_Login ? $plugin->site_login_url($redirect) : wp_login_url($redirect);
-}
-
-/**
- * Public transactional SMS gateway for other Luna plugins.
- *
- * @param string $mobile  Recipient mobile number.
- * @param string $message Complete message body.
- * @return array|WP_Error
- */
-function kml_send_transactional_sms($mobile, $message) {
-	$plugin = $GLOBALS['kadec_mobile_login'] ?? null;
-	if (! $plugin instanceof KADEC_Mobile_Login) {
-		return new WP_Error('kml_unavailable', 'درگاه پیامک افزونه ورود در دسترس نیست.');
-	}
-	return $plugin->send_transactional_sms($mobile, $message);
-}
+new KADEC_Mobile_Login();
