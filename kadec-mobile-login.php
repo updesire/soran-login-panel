@@ -3,7 +3,7 @@
  * Plugin Name: لاگین سوران
  * Plugin URI: https://rocketzi.com
  * Description: تنظیمات ورود و ثبت‌نام موبایلی مخصوص ووکامرس و قالب Woodmart.
- * Version: 1.6.4
+ * Version: 1.6.5
  * Author: Soran
  * Text Domain: kadec-mobile-login
  */
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) exit;
 final class KADEC_Mobile_Login {
     const OPTION = 'kml_options';
     const NONCE  = 'kml_nonce';
-    const VERSION = '1.6.4';
+    const VERSION = '1.6.5';
 
     /** @var array|null Runtime cache for plugin options to avoid repeated wp_parse_args/defaults calls. */
     private $options_cache = null;
