@@ -357,7 +357,7 @@ final class KADEC_Mobile_Login {
         $parts = array_values(array_filter(array_map('trim', (array) $parts), static function($item) {
             return $item !== '';
         }));
-        return !empty($parts) ? $parts : [$code];
+        return $parts ? implode(';', $parts) : $code;
     }
 
     private function melipayamak_request($endpoint, $payload) {
@@ -1089,7 +1089,7 @@ final class KADEC_Mobile_Login {
         $code = $this->generate_code();
         $sent = $this->send_sms($mobile, $code);
         if (is_wp_error($sent)) wp_send_json_error(['message' => $sent->get_error_message()]);
-        wp_send_json_success(['message' => 'پیامک تست ارسال شد. پاسخ پنل: ' . esc_html($sent['body'])]);
+        wp_send_json_success(['message' => 'درخواست پیامک تست پذیرفته شد. شناسه پیگیری: ' . $sent['rec_id']]);
     }
 
     public function replace_woocommerce_login_form() {
